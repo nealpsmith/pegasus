@@ -39,6 +39,54 @@ def parse_restriction_string(rstr):
                 content.add(prefix + str(i))
     return (name, isin, content)
 
+def aggregate_repertoires(
+    csv_file: str,
+    genome: str,
+    chains: List[str] =["TRA", "TRB"],
+    chain_vars: List[str] = ["cdr3", "cdr3_nt", "v_gene", "j_gene"]) :
+    import h5py
+    t1 = time.time()
+    # Load in the csv
+    h5_df = pd.read_csv(csv_file)
+
+    # Make a dict for sample info
+    sample_dict = dict(zip(h5_df.tcr_location, h5_df.h5_location))
+
+    # Make a dict of the chains and variables to add
+    chain_dict = {key: chain_vars for key in chains}
+    print(chain_dict)
+
+    # Iterate across the chain dict to sequentially add information
+    for tcr, h5 in sample_dict.items() :
+        print(tcr)
+        tcr_data = pd.read_csv(tcr)
+        # Remove non-productive rearrangements and get data for just the chains needed
+        df = tcr_data[(tcr_data["productive"] == "True") & (tcr_data["chain"].isin(chains))]
+
+        for chain, var in chain_dict.items() :
+            chain_data = df[df["chain"] == chain]
+            for seq_type in var :
+                data_dict = dict(zip(chain_data["barcode"], chain_data[seq_type]))
+
+                with h5py.File(h5, "r+") as f :
+                    codes = f["/".join([genome, "barcodes"])][()]
+                    codes = [code.decode() for code in codes]
+
+                    rep_array = np.array("" * len(codes))
+                    rep_array = [data_dict[code] if len(code) > 1 and code in data_dict.keys() else "" for code in codes]
+                    rep_array = np.array(rep_array, dtype = "|S128")
+                    path = "/".join([genome, "_".join([chain, seq_type])])
+                    
+                    try :
+                        f.create_dataset(path, data = rep_array)
+                    except :
+                        print("{path} already exists, going to overwrite".format(path = path))
+                        del f[path]
+                        f.create_dataset(path, data = rep_array)
+    t2 = time.time()
+    print("Repertoire incorporation is finished in {:.2f}s.".format(t2 - t1))
+
+
 
 def aggregate_matrices(
     csv_file: str,
