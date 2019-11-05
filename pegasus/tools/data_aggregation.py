@@ -41,8 +41,7 @@ def parse_restriction_string(rstr):
 
 def aggregate_repertoires(
     csv_file: str,
-    genome: str,
-    chains: List[str] =["TRA", "TRB"],
+    chains: List[str] =["TRA", "TRB", "TRD", "TRG"],
     chain_vars: List[str] = ["cdr3", "cdr3_nt", "v_gene", "j_gene"]) :
     import h5py
     t1 = time.time()
@@ -50,15 +49,13 @@ def aggregate_repertoires(
     h5_df = pd.read_csv(csv_file)
 
     # Make a dict for sample info
-    sample_dict = dict(zip(h5_df.tcr_location, h5_df.h5_location))
+    sample_dict = dict(zip(h5_df.tcr_location, zip(h5_df.h5_location, h5_df.genome)))
 
     # Make a dict of the chains and variables to add
     chain_dict = {key: chain_vars for key in chains}
-    print(chain_dict)
 
     # Iterate across the chain dict to sequentially add information
-    for tcr, h5 in sample_dict.items() :
-        print(tcr)
+    for tcr, h5_info in sample_dict.items() :
         tcr_data = pd.read_csv(tcr)
         # Remove non-productive rearrangements and get data for just the chains needed
         df = tcr_data[(tcr_data["productive"] == "True") & (tcr_data["chain"].isin(chains))]
@@ -68,14 +65,14 @@ def aggregate_repertoires(
             for seq_type in var :
                 data_dict = dict(zip(chain_data["barcode"], chain_data[seq_type]))
 
-                with h5py.File(h5, "r+") as f :
-                    codes = f["/".join([genome, "barcodes"])][()]
+                with h5py.File(h5_info[0], "r+") as f :
+                    codes = f["/".join([h5_info[1], "barcodes"])][()]
                     codes = [code.decode() for code in codes]
 
                     rep_array = np.array("" * len(codes))
                     rep_array = [data_dict[code] if len(code) > 1 and code in data_dict.keys() else "" for code in codes]
                     rep_array = np.array(rep_array, dtype = "|S128")
-                    path = "/".join([genome, "_".join([chain, seq_type])])
+                    path = "/".join([h5_info[1], "_".join([chain, seq_type])])
                     
                     try :
                         f.create_dataset(path, data = rep_array)
@@ -97,6 +94,7 @@ def aggregate_matrices(
     select_singlets: bool = False,
     ngene: int = None,
     concat_matrices: bool = False,
+    repertoire_data: bool = False
 ) -> "None or AnnData or MemData":
     """Aggregate channel-specific count matrices into one big count matrix.
 
@@ -187,7 +185,9 @@ def aggregate_matrices(
             return_type="MemData",
             ngene=ngene,
             select_singlets=select_singlets,
+            repertoire_data = repertoire_data
         )
+
         data.update_barcode_metadata_info(sample_name, row, attributes)
         aggrData.addAggrData(data)
 

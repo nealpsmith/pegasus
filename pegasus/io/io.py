@@ -18,7 +18,7 @@ from . import Array2D, MemData
 logger = logging.getLogger("pegasus")
 
 
-def load_10x_h5_file_v2(h5_in: "tables.File", fn: str, ngene: int = None) -> "MemData":
+def load_10x_h5_file_v2(h5_in: "tables.File", fn: str, ngene: int = None, repertoire_data : bool = False) -> "MemData":
     """Load 10x v2 format matrix from hdf5 file
 
     Parameters
@@ -40,7 +40,6 @@ def load_10x_h5_file_v2(h5_in: "tables.File", fn: str, ngene: int = None) -> "Me
     --------
     >>> io.load_10x_h5_file_v2(h5_in)
     """
-
     data = MemData()
     for group in h5_in.list_nodes("/", "Group"):
         genome = group._v_name
@@ -54,14 +53,18 @@ def load_10x_h5_file_v2(h5_in: "tables.File", fn: str, ngene: int = None) -> "Me
             ),
             shape=(N, M),
         )
-
         barcodes = h5_in.get_node("/" + genome + "/barcodes").read().astype(str)
         ids = h5_in.get_node("/" + genome + "/genes").read().astype(str)
         names = h5_in.get_node("/" + genome + "/gene_names").read().astype(str)
+        TRA_cdr3 = h5_in.get_node("/" + genome + "/TRA_cdr3").read().astype(str)
 
         array2d = Array2D(
             {"barcodekey": barcodes}, {"featurekey": ids, "featurename": names}, mat
         )
+        if repertoire_data :
+            add_repertoire_data(h5_in, array2d, genome)
+        array2d.barcode_metadata["TRA_cdr3"] = TRA_cdr3
+
         array2d.filter(ngene=ngene)
         array2d.separate_channels(fn)
 
@@ -69,8 +72,22 @@ def load_10x_h5_file_v2(h5_in: "tables.File", fn: str, ngene: int = None) -> "Me
 
     return data
 
+def add_repertoire_data(
+    h5_in : "tables.File",
+    array2d, 
+    genome : str,
+    chains: List[str] =["TRA", "TRB", "TRD", "TRG"],
+    chain_vars: List[str] = ["cdr3", "cdr3_nt", "v_gene", "j_gene"]) :
+    
+    for chain in chains :
+        for seq_type in chain_vars :
+            add_data = "_".join([chain, seq_type])
+            try :
+                array2d.barcode_metadata[add_data] = h5_in.get_node("/" + genome + "/{add_data}".format(add_data = add_data))
+            except :
+                continue
 
-def load_10x_h5_file_v3(h5_in: "tables.File", fn: str, ngene: int = None) -> "MemData":
+def load_10x_h5_file_v3(h5_in: "tables.File", fn: str, ngene: int = None, repertoire_data : bool = False) -> "MemData":
     """Load 10x v3 format matrix from hdf5 file
 
     Parameters
@@ -123,7 +140,7 @@ def load_10x_h5_file_v3(h5_in: "tables.File", fn: str, ngene: int = None) -> "Me
     return data
 
 
-def load_10x_h5_file(input_h5: str, ngene: int = None) -> "MemData":
+def load_10x_h5_file(input_h5: str, ngene: int = None, repertoire_data : bool = False) -> "MemData":
     """Load 10x format matrix (either v2 or v3) from hdf5 file
 
     Parameters
@@ -150,9 +167,9 @@ def load_10x_h5_file(input_h5: str, ngene: int = None) -> "MemData":
     with tables.open_file(input_h5) as h5_in:
         try:
             node = h5_in.get_node("/matrix")
-            data = load_10x_h5_file_v3(h5_in, fn, ngene)
+            data = load_10x_h5_file_v3(h5_in, fn, ngene, repertoire_data  = repertoire_data)
         except tables.exceptions.NoSuchNodeError:
-            data = load_10x_h5_file_v2(h5_in, fn, ngene)
+            data = load_10x_h5_file_v2(h5_in, fn, ngene, repertoire_data = repertoire_data)
 
     return data
 
@@ -588,6 +605,7 @@ def read_input(
     select_singlets: bool = False,
     channel_attr: str = None,
     black_list: List[str] = [],
+    repertoire_data: bool = False
 ) -> "MemData or AnnData or List[AnnData]":
     """Load data into memory.
 
@@ -637,7 +655,7 @@ def read_input(
             input_file, ngene=ngene, select_singlets=select_singlets
         )
     elif file_format == "10x":
-        data = load_10x_h5_file(input_file, ngene=ngene)
+        data = load_10x_h5_file(input_file, ngene=ngene, repertoire_data = repertoire_data)
     elif file_format == "h5ad":
         data = anndata.read_h5ad(
             input_file, backed=(None if h5ad_mode == "a" else h5ad_mode)
