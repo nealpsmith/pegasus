@@ -56,14 +56,12 @@ def load_10x_h5_file_v2(h5_in: "tables.File", fn: str, ngene: int = None, repert
         barcodes = h5_in.get_node("/" + genome + "/barcodes").read().astype(str)
         ids = h5_in.get_node("/" + genome + "/genes").read().astype(str)
         names = h5_in.get_node("/" + genome + "/gene_names").read().astype(str)
-        TRA_cdr3 = h5_in.get_node("/" + genome + "/TRA_cdr3").read().astype(str)
 
         array2d = Array2D(
             {"barcodekey": barcodes}, {"featurekey": ids, "featurename": names}, mat
         )
         if repertoire_data :
             add_repertoire_data(h5_in, array2d, genome)
-        array2d.barcode_metadata["TRA_cdr3"] = TRA_cdr3
 
         array2d.filter(ngene=ngene)
         array2d.separate_channels(fn)
