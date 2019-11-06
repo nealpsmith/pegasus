@@ -821,7 +821,7 @@ def add_repertoire_data(
     array2d, 
     genome : str,
     chains: List[str] =["TRA", "TRB", "TRD", "TRG"],
-    chain_vars: List[str] = ["cdr3", "cdr3_nt", "v_gene", "j_gene"]) :
+    chain_vars: List[str] = ["cdr3", "cdr3_nt", "v_gene", "j_gene", "reads", "umis"]) :
     
     for chain in chains :
         for seq_type in chain_vars :
