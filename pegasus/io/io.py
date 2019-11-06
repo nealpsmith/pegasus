@@ -72,20 +72,6 @@ def load_10x_h5_file_v2(h5_in: "tables.File", fn: str, ngene: int = None, repert
 
     return data
 
-def add_repertoire_data(
-    h5_in : "tables.File",
-    array2d, 
-    genome : str,
-    chains: List[str] =["TRA", "TRB", "TRD", "TRG"],
-    chain_vars: List[str] = ["cdr3", "cdr3_nt", "v_gene", "j_gene"]) :
-    
-    for chain in chains :
-        for seq_type in chain_vars :
-            add_data = "_".join([chain, seq_type])
-            try :
-                array2d.barcode_metadata[add_data] = h5_in.get_node("/" + genome + "/{add_data}".format(add_data = add_data))
-            except :
-                continue
 
 def load_10x_h5_file_v3(h5_in: "tables.File", fn: str, ngene: int = None, repertoire_data : bool = False) -> "MemData":
     """Load 10x v3 format matrix from hdf5 file
@@ -831,3 +817,18 @@ def write_output(
 
     end = time.time()
     logger.info("Write output is finished. Time spent = {:.2f}s.".format(end - start))
+
+def add_repertoire_data(
+    h5_in : "tables.File",
+    array2d, 
+    genome : str,
+    chains: List[str] =["TRA", "TRB", "TRD", "TRG"],
+    chain_vars: List[str] = ["cdr3", "cdr3_nt", "v_gene", "j_gene"]) :
+    
+    for chain in chains :
+        for seq_type in chain_vars :
+            add_data = "_".join([chain, seq_type])
+            try :
+                array2d.barcode_metadata[add_data] = h5_in.get_node("/" + genome + "/{add_data}".format(add_data = add_data))
+            except :
+                continue

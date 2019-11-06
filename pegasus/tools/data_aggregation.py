@@ -42,7 +42,7 @@ def parse_restriction_string(rstr):
 def aggregate_repertoires(
     csv_file: str,
     chains: List[str] =["TRA", "TRB", "TRD", "TRG"],
-    chain_vars: List[str] = ["cdr3", "cdr3_nt", "v_gene", "j_gene"]) :
+    chain_vars: List[str] = ["cdr3", "cdr3_nt", "v_gene", "j_gene", "reads", "umis"]) :
     import h5py
     t1 = time.time()
     # Load in the csv
@@ -59,7 +59,6 @@ def aggregate_repertoires(
         tcr_data = pd.read_csv(tcr)
         # Remove non-productive rearrangements and get data for just the chains needed
         df = tcr_data[(tcr_data["productive"] == "True") & (tcr_data["chain"].isin(chains))]
-
         for chain, var in chain_dict.items() :
             chain_data = df[df["chain"] == chain]
             for seq_type in var :
